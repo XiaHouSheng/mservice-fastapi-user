@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.database import init_db
+from app.services.business_registry import setup_services
 from app.utils.logger import setup_logger
 
 
@@ -14,6 +15,8 @@ async def lifespan(app: FastAPI):
     """应用生命周期：启动时初始化数据库，关闭时清理资源。"""
     logger = setup_logger()
     logger.info("正在启动 %s v%s (env=%s)", settings.APP_NAME, settings.APP_VERSION, settings.APP_ENV)
+    setup_services()
+    logger.info("业务服务注册完成")
     await init_db()
     logger.info("数据库初始化完成")
     yield

@@ -12,7 +12,8 @@ async def test_get_me(client):
             "username": "testuser",
             "email": "test@example.com",
             "password": "Test@1234",
-            "gender": "male",
+            "full_name": "Test User",
+            "service_name": "default",
         },
     )
     token = register_resp.json()["access_token"]
@@ -24,6 +25,8 @@ async def test_get_me(client):
     data = response.json()
     assert data["username"] == "testuser"
     assert data["email"] == "test@example.com"
+    assert data["full_name"] == "Test User"
+    assert data["service_name"] == "default"
 
 
 @pytest.mark.asyncio
@@ -42,19 +45,19 @@ async def test_update_me(client):
             "username": "testuser",
             "email": "test@example.com",
             "password": "Test@1234",
-            "gender": "male",
+            "service_name": "default",
         },
     )
     token = register_resp.json()["access_token"]
     response = await client.put(
         "/api/v1/users/me",
         headers={"Authorization": f"Bearer {token}"},
-        json={"full_name": "Test User", "bio": "Hello World"},
+        json={"full_name": "Updated Name", "service_name": "forum"},
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["full_name"] == "Test User"
-    assert data["bio"] == "Hello World"
+    assert data["full_name"] == "Updated Name"
+    assert data["service_name"] == "forum"
 
 
 @pytest.mark.asyncio
@@ -66,7 +69,7 @@ async def test_change_password(client):
             "username": "testuser",
             "email": "test@example.com",
             "password": "Test@1234",
-            "gender": "male",
+            "service_name": "default",
         },
     )
     token = register_resp.json()["access_token"]
@@ -77,7 +80,6 @@ async def test_change_password(client):
     )
     assert response.status_code == 204
 
-    # 用新密码登录
     login_resp = await client.post(
         "/api/v1/auth/login",
         data={"username": "testuser", "password": "New@12345"},
@@ -94,7 +96,7 @@ async def test_delete_me(client):
             "username": "testuser",
             "email": "test@example.com",
             "password": "Test@1234",
-            "gender": "male",
+            "service_name": "default",
         },
     )
     token = register_resp.json()["access_token"]
@@ -104,9 +106,62 @@ async def test_delete_me(client):
     )
     assert response.status_code == 204
 
-    # 删除后无法登录
     login_resp = await client.post(
         "/api/v1/auth/login",
         data={"username": "testuser", "password": "Test@1234"},
     )
     assert login_resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_id(client):
+    """测试按 ID 获取用户。"""
+    register_resp = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "Test@1234",
+            "service_name": "default",
+        },
+    )
+    token = register_resp.json()["access_token"]
+    response = await client.get(
+        "/api/v1/users/1",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["username"] == "testuser"
+
+
+@pytest.mark.asyncio
+async def test_list_users(client):
+    """测试获取用户列表。"""
+    for i in range(3):
+        await client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": f"user{i}",
+                "email": f"user{i}@example.com",
+                "password": "Test@1234",
+                "service_name": "default",
+            },
+        )
+    register_resp = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "adminuser",
+            "email": "admin@example.com",
+            "password": "Test@1234",
+            "service_name": "default",
+        },
+    )
+    token = register_resp.json()["access_token"]
+    response = await client.get(
+        "/api/v1/users?skip=0&limit=10",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 4
+    assert len(data["items"]) == 4

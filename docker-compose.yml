@@ -12,6 +12,7 @@ services:
       - SECRET_KEY=change-this-in-production
       - LOG_LEVEL=INFO
     volumes:
+      # SQLite 数据库及 WAL/SHM 辅助文件持久化到宿主机 ./data 目录
       - ./data:/app/data
       - ./logs:/app/logs
     restart: unless-stopped

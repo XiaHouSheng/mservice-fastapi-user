@@ -40,6 +40,7 @@ async def init_db() -> None:
     """创建所有数据表（开发环境快速初始化）。"""
     # 确保模型被注册
     import app.models  # noqa: F401
+    import app.models.extensions  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

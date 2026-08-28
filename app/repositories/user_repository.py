@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import UserStatus
 from app.models.user import User
 
 
@@ -56,16 +55,14 @@ class UserRepository:
 
     async def update_last_login(self, user: User) -> User:
         """更新最后登录时间。"""
-        user.last_login_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)
         await self.db.flush()
         return user
 
     async def soft_delete(self, user: User) -> User:
         """软删除用户。"""
         user.is_deleted = True
-        user.status = UserStatus.DELETED
         user.deleted_at = datetime.now(timezone.utc)
-        user.is_active = False
         await self.db.flush()
         return user
 
@@ -80,12 +77,12 @@ class UserRepository:
         self,
         skip: int = 0,
         limit: int = 20,
-        status: UserStatus | None = None,
+        service_name: str | None = None,
     ) -> tuple[list[User], int]:
         """分页获取用户列表，返回 (用户列表, 总数)。"""
         base_where = [User.is_deleted.is_(False)]
-        if status is not None:
-            base_where.append(User.status == status)
+        if service_name is not None:
+            base_where.append(User.service_name == service_name)
 
         count_stmt = select(func.count()).select_from(User).where(*base_where)
         total = (await self.db.execute(count_stmt)).scalar_one()

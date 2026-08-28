@@ -23,36 +23,42 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def _create_token(subject: str, user_id: int, role: str, expires_delta: timedelta, token_type: str) -> str:
+def _create_token(
+    subject: str,
+    user_id: int,
+    service_name: str,
+    expires_delta: timedelta,
+    token_type: str,
+) -> str:
     """生成 JWT 令牌。"""
     expire = datetime.now(timezone.utc) + expires_delta
     payload: dict[str, Any] = {
         "sub": subject,
         "user_id": user_id,
-        "role": role,
+        "service_name": service_name,
         "type": token_type,
         "exp": expire,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_access_token(subject: str, user_id: int, role: str) -> str:
+def create_access_token(subject: str, user_id: int, service_name: str) -> str:
     """生成访问令牌（默认 30 分钟）。"""
     return _create_token(
         subject=subject,
         user_id=user_id,
-        role=role,
+        service_name=service_name,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
         token_type="access",
     )
 
 
-def create_refresh_token(subject: str, user_id: int, role: str) -> str:
+def create_refresh_token(subject: str, user_id: int, service_name: str) -> str:
     """生成刷新令牌（默认 7 天）。"""
     return _create_token(
         subject=subject,
         user_id=user_id,
-        role=role,
+        service_name=service_name,
         expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         token_type="refresh",
     )

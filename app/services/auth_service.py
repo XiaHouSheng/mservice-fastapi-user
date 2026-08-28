@@ -21,7 +21,7 @@ class AuthService:
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
-        self.repo: UserRepository = LogProxy(UserRepository(db))
+        self.repo: UserRepository = LogProxy(UserRepository(db))  # type: ignore[assignment]
         self.user_service = UserService(db)
 
     async def register(self, user_data: UserCreate) -> TokenResponse:
@@ -82,11 +82,11 @@ class AuthService:
         access_token = create_access_token(
             subject=user.username,
             user_id=user.id,
-            role=user.role.value,
+            service_name=user.service_name,
         )
         refresh_token = create_refresh_token(
             subject=user.username,
             user_id=user.id,
-            role=user.role.value,
+            service_name=user.service_name,
         )
         return TokenResponse(access_token=access_token, refresh_token=refresh_token)

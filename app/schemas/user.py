@@ -2,8 +2,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.models.enums import Gender, UserRole, UserStatus
-
 USERNAME_PATTERN = r"^[a-zA-Z0-9_]{3,50}$"
 PASSWORD_PATTERN = r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,30}$"
 
@@ -11,15 +9,13 @@ PASSWORD_PATTERN = r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=USERNAME_PATTERN)
     email: EmailStr
-    gender: Gender
     full_name: str | None = Field(None, max_length=100)
-    phone: str | None = Field(None, max_length=20)
-    avatar_url: str | None = Field(None, max_length=255)
-    bio: str | None = Field(None, max_length=500)
+    service_name: str = Field("default", max_length=50)
 
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=30)
+    profile: dict[str, object] | None = Field(None, description="业务扩展字段，根据 service_name 对应扩展表")
 
     @field_validator("password")
     @classmethod
@@ -33,10 +29,8 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     full_name: str | None = Field(None, max_length=100)
-    phone: str | None = Field(None, max_length=20)
-    avatar_url: str | None = Field(None, max_length=255)
-    bio: str | None = Field(None, max_length=500)
-    gender: Gender | None = None
+    service_name: str | None = Field(None, max_length=50)
+    profile: dict[str, object] | None = Field(None, description="业务扩展字段，根据 service_name 对应扩展表")
 
 
 class UserChangePassword(BaseModel):
@@ -54,25 +48,14 @@ class UserChangePassword(BaseModel):
 
 
 class UserResponse(BaseModel):
+    """基础用户响应，所有 service 共享的字段。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     username: str
     email: EmailStr
-    gender: Gender
-    role: UserRole
-    status: UserStatus
     full_name: str | None
-    phone: str | None
-    avatar_url: str | None
-    bio: str | None
-    is_active: bool
-    is_verified: bool
+    service_name: str
     created_at: datetime
     updated_at: datetime | None
-    last_login_at: datetime | None
-
-
-class UserListResponse(BaseModel):
-    total: int
-    items: list[UserResponse]
