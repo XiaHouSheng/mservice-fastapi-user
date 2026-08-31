@@ -86,3 +86,7 @@ venv.bak/
 # macOS / Windows 系统文件
 .DS_Store
 Thumbs.db
+
+# JWT 密钥（私钥严禁提交仓库，公钥可通过其他渠道分发）
+keys/
+!keys/.gitkeep

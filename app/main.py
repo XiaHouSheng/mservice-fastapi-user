@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.security import get_jwks
 from app.services.business_registry import setup_services
 from app.utils.logger import setup_logger
 
@@ -58,7 +59,13 @@ def create_app() -> FastAPI:
             "version": settings.APP_VERSION,
             "docs": "/docs",
             "health": "/health",
+            "jwks": "/.well-known/jwks.json",
         }
+
+    # JWT 公钥（JWKS），供其他服务获取公钥验证本服务签发的令牌
+    @app.get("/.well-known/jwks.json", tags=["系统"], summary="JWT 公钥（JWKS）")
+    async def jwks() -> dict:
+        return get_jwks()
 
     return app
 

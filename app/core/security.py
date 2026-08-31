@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from jose import JWTError, jwt
+from jose.jwk import RSAKey
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -11,6 +13,18 @@ pwd_context = CryptContext(
     deprecated="auto",
     bcrypt__rounds=settings.PASSWORD_BCRYPT_ROUNDS,
 )
+
+
+def _load_key(value: str) -> str:
+    """解析 JWT 密钥：若值为 PEM 字符串则直接返回，否则视为文件路径读取。"""
+    if value and "-----BEGIN" not in value:
+        return Path(value).read_text(encoding="utf-8")
+    return value
+
+
+# RS256 非对称：私钥仅用于签发（保留在 user-service），公钥用于校验（可对外分发）
+_private_key = _load_key(settings.JWT_PRIVATE_KEY)
+_public_key = _load_key(settings.JWT_PUBLIC_KEY)
 
 
 def hash_password(password: str) -> str:
@@ -30,7 +44,7 @@ def _create_token(
     expires_delta: timedelta,
     token_type: str,
 ) -> str:
-    """生成 JWT 令牌。"""
+    """使用私钥生成 JWT 令牌。"""
     expire = datetime.now(timezone.utc) + expires_delta
     payload: dict[str, Any] = {
         "sub": subject,
@@ -39,7 +53,7 @@ def _create_token(
         "type": token_type,
         "exp": expire,
     }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(payload, _private_key, algorithm=settings.ALGORITHM)
 
 
 def create_access_token(subject: str, user_id: int, service_name: str) -> str:
@@ -65,8 +79,14 @@ def create_refresh_token(subject: str, user_id: int, service_name: str) -> str:
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    """解码并校验 JWT，失败抛出 JWTError。"""
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    """使用公钥解码并校验 JWT，失败抛出 JWTError。"""
+    return jwt.decode(token, _public_key, algorithms=[settings.ALGORITHM])
+
+
+def get_jwks() -> dict[str, Any]:
+    """以 JWK 集合形式返回公钥，供其他服务通过 /.well-known/jwks.json 获取并验证令牌。"""
+    rsa_key: RSAKey = RSAKey(_public_key.encode("utf-8"), algorithm=settings.ALGORITHM)
+    return {"keys": [rsa_key.to_dict()]}
 
 
 __all__ = [
@@ -75,5 +95,6 @@ __all__ = [
     "create_access_token",
     "create_refresh_token",
     "decode_token",
+    "get_jwks",
     "JWTError",
 ]

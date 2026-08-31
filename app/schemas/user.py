@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 USERNAME_PATTERN = r"^[a-zA-Z0-9_]{3,50}$"
 PASSWORD_PATTERN = r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,30}$"
 
-
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=USERNAME_PATTERN)
     email: EmailStr

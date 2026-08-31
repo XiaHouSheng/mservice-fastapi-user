@@ -115,16 +115,26 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# 编辑 .env，修改 SECRET_KEY 等配置
+# 编辑 .env，配置 JWT_PRIVATE_KEY / JWT_PUBLIC_KEY（密钥路径或 PEM 字符串）等
 ```
 
-### 3. 运行服务
+### 3. 生成 JWT 密钥（RS256 非对称）
+
+```bash
+python scripts/generate_jwt_keys.py
+```
+
+生成：
+- `keys/jwt_private.pem`：**私钥**，仅保留在 user-service，严禁提交仓库（已加入 `.gitignore`）；
+- `keys/jwt_public.pem`：**公钥**，可分发给任何需要校验 JWT 的兄弟服务。
+
+### 4. 运行服务
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 4. 访问 API 文档
+### 5. 访问 API 文档
 
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
@@ -306,11 +316,26 @@ alembic downgrade -1
 
 ## Docker 部署
 
+### 1. 先在本机生成 JWT 密钥
+
+```bash
+python scripts/generate_jwt_keys.py
+# 生成 keys/jwt_private.pem（私钥）与 keys/jwt_public.pem（公钥）
+```
+
+> `keys/` 目录已被 `.dockerignore` 排除，**不会烘焙进镜像**；运行时通过 `./keys:/app/keys:ro` 只读卷注入。
+> **务必先在宿主机生成好密钥再启动容器**，否则容器启动即失败（密钥缺失 fail-fast）。
+
+### 2. 构建并启动
+
 ```bash
 docker-compose up -d --build
 ```
 
-SQLite 数据库文件通过 `./data:/app/data` 卷挂载持久化，日志通过 `./logs:/app/logs` 挂载。
+- JWT 私钥 / 公钥：`./keys:/app/keys:ro` 只读挂载注入（容器仅读取，私钥不落盘在镜像层）
+- SQLite 数据库：`./data:/app/data` 卷持久化
+- 日志：`./logs:/app/logs` 挂载
+- 生产环境建议：私钥放入密钥管理服务（KMS / Vault / 云 Secret），通过 Secret 挂载覆盖 `JWT_PRIVATE_KEY`，公钥可分发给各兄弟服务校验
 
 ## 运行测试
 
@@ -324,10 +349,48 @@ pytest tests/ -v
 - 注册机（注册、重复检测、获取、列出、装饰器、注销）
 - 分发器（默认服务、多服务分发、profile 传入、未知服务回退、批量分发）
 
+## JWT 认证（RS256 非对称加密）
+
+本服务使用 **RS256 非对称算法**签发与校验 JWT：
+
+- **签发**：登录 / 注册时使用 `keys/jwt_private.pem`（私钥）签名，私钥只存在于 user-service，绝不外发。
+- **本服务校验**：内部用 `keys/jwt_public.pem`（公钥）校验自己签发的令牌。
+- **其他服务校验**：其他服务只需持有**公钥**即可验证 user-service 签发的令牌，无需也不应接触私钥。公钥获取方式：
+  1. 直接复制 `keys/jwt_public.pem` 文件；
+  2. 从本服务动态拉取：`GET /.well-known/jwks.json`（标准 JWKS 格式）。
+
+配置项（`.env`，值既可以是 PEM 文件路径，也可以是 PEM 字符串）：
+
+```
+JWT_PRIVATE_KEY=keys/jwt_private.pem
+JWT_PUBLIC_KEY=keys/jwt_public.pem
+ALGORITHM=RS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+```
+
+### 其他服务校验示例（Python + python-jose）
+
+```python
+from jose import jwt
+
+# 方式一：使用公钥 PEM 文件
+with open("keys/jwt_public.pem", "rb") as f:
+    public_key = f.read()
+payload = jwt.decode(token, public_key, algorithms=["RS256"])
+
+# 方式二：从 user-service 的 JWKS 端点动态获取公钥
+import requests
+jwks = requests.get("http://user-service:8000/.well-known/jwks.json").json()
+payload = jwt.decode(token, jwks["keys"][0], algorithms=["RS256"])
+```
+
+> 注意：`kid` 未使用场景下直接传 JWKS 中的第一个 key 即可；若后续支持多密钥轮换，请按 `kid` 匹配。
+
 ## 安全特性
 
 - 密码 bcrypt 哈希存储（12 轮）
-- JWT 访问令牌（30 分钟）+ 刷新令牌（7 天）
+- JWT RS256 非对称签名：私钥签发、公钥校验（访问令牌 30 分钟 + 刷新令牌 7 天），公开 JWKS 端点供其他服务验证
 - 敏感信息日志自动脱敏（password、email 等）
 - CORS 来源限制
 - SQL 注入防护（ORM 参数化查询）

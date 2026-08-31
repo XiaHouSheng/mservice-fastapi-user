@@ -28,9 +28,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/user_service.db"
     DATABASE_ECHO: bool = False
 
-    # JWT
-    SECRET_KEY: str = "your-secret-key-change-in-production"
-    ALGORITHM: str = "HS256"
+    # JWT（RS256 非对称加密：私钥签发，公钥校验）
+    # 值可以是 PEM 字符串，也可以是 PEM 文件路径（security.py 自动识别并读取）
+    JWT_PRIVATE_KEY: str = "keys/jwt_private.pem"
+    JWT_PUBLIC_KEY: str = "keys/jwt_public.pem"
+    ALGORITHM: str = "RS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
