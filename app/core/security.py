@@ -38,6 +38,7 @@ def _create_token(
     subject: str,
     user_id: int,
     service_name: str,
+    role: str,
     expires_delta: timedelta,
     token_type: str,
 ) -> str:
@@ -47,6 +48,7 @@ def _create_token(
         "sub": subject,
         "user_id": user_id,
         "service_name": service_name,
+        "role": role,
         "type": token_type,
         "exp": expire,
     }
@@ -59,23 +61,25 @@ def _create_token(
     )
 
 
-def create_access_token(subject: str, user_id: int, service_name: str) -> str:
+def create_access_token(subject: str, user_id: int, service_name: str, role: str) -> str:
     """生成访问令牌（默认 30 分钟）。"""
     return _create_token(
         subject=subject,
         user_id=user_id,
         service_name=service_name,
+        role=role,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
         token_type="access",
     )
 
 
-def create_refresh_token(subject: str, user_id: int, service_name: str) -> str:
+def create_refresh_token(subject: str, user_id: int, service_name: str, role: str) -> str:
     """生成刷新令牌（默认 7 天）。"""
     return _create_token(
         subject=subject,
         user_id=user_id,
         service_name=service_name,
+        role=role,
         expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         token_type="refresh",
     )

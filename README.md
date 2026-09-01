@@ -125,6 +125,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | `hashed_password` | String(255) | bcrypt 密码哈希 |
 | `full_name` | String(100) | 全名，可空 |
 | `service_name` | String(50) | 业务服务标识，默认 `default` |
+| `role` | String(20) | 用户角色，默认 `user`；超级用户为 `superuser` |
 | `created_at` | DateTime | 创建时间 |
 | `updated_at` | DateTime | 更新时间 |
 | `deleted_at` | DateTime | 删除时间（软删除） |
@@ -151,10 +152,40 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
   "email": "demo@example.com",
   "full_name": "Demo User",
   "service_name": "default",
+  "role": "user",
   "created_at": "2026-09-01T00:00:00",
   "updated_at": null
 }
 ```
+
+## 超级用户自动创建（部署引导）
+
+服务启动时（lifespan）会根据 `.env` 配置自动创建超级用户，用于平台级管理操作（如后续兄弟微服务的管理接口鉴权）。
+
+### 配置项
+
+```
+SUPERUSER_USERNAME=superuser
+SUPERUSER_PASSWORD=          # 为空则不创建；生产环境必须显式注入强密码
+SUPERUSER_EMAIL=superuser@local.local
+SUPERUSER_FULL_NAME=Super User
+SUPERUSER_SERVICE_NAME=default
+```
+
+### 行为规则
+
+- `SUPERUSER_PASSWORD` 为空 → 跳过创建（未启用该能力）；
+- 密码强度不足（长度 < 8 / 常见弱口令 / 与用户名相同）→ 拒绝创建，避免默认弱口令风险；
+- 用户名或邮箱已存在（含软删除）→ 跳过，不重置密码、不修改角色；
+- 创建的用户 `role=superuser`，登录后签发的 JWT 携带 `role` 声明（`TokenPayload.role` 已预留），供其他兄弟微服务做权限判定。
+
+### Docker 部署注入密码
+
+```bash
+SUPERUSER_PASSWORD='your-strong-password' docker-compose up -d --build
+```
+
+> 密码通过宿主机环境变量注入（`docker-compose.yml` 中 `${SUPERUSER_PASSWORD:-}`），请勿硬编码进仓库。
 
 ## 可注册业务列表
 

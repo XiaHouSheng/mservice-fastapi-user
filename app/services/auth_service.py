@@ -83,10 +83,12 @@ class AuthService:
             subject=user.username,
             user_id=user.id,
             service_name=user.service_name,
+            role=user.role,
         )
         refresh_token = create_refresh_token(
             subject=user.username,
             user_id=user.id,
             service_name=user.service_name,
+            role=user.role,
         )
         return TokenResponse(access_token=access_token, refresh_token=refresh_token)

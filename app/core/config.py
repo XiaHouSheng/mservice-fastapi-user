@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     # 密码
     PASSWORD_BCRYPT_ROUNDS: int = 12
 
+    # 超级用户（部署引导：服务启动时按以下配置自动创建；SUPERUSER_PASSWORD 为空则不创建）
+    SUPERUSER_USERNAME: str = "superuser"
+    SUPERUSER_PASSWORD: str = ""          # 生产环境必须显式注入强密码
+    SUPERUSER_EMAIL: str = "superuser@local.local"
+    SUPERUSER_FULL_NAME: str = "Super User"
+    SUPERUSER_SERVICE_NAME: str = "default"
+
     # 日志
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/user_service.log"

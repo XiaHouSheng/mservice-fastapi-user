@@ -54,5 +54,6 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str | None
     service_name: str
+    role: str
     created_at: datetime
     updated_at: datetime | None

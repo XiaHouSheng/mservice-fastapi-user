@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import api_router
+from app.core.bootstrap import init_superuser
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.security import get_jwks, key_manager
@@ -33,6 +34,11 @@ async def lifespan(app: FastAPI):
     logger.info("JWT 当前签名 kid=%s，活跃公钥=%s", key_manager.current_kid, key_manager.get_active_kids())
     await init_db()
     logger.info("数据库初始化完成")
+
+    if await init_superuser():
+        logger.info("超级用户初始化完成（已自动创建）")
+    else:
+        logger.info("超级用户初始化：跳过（未配置 / 已存在 / 密码强度不足）")
 
     rotation_task = asyncio.create_task(_rotation_loop(logger))
     logger.info(

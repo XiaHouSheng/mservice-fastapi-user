@@ -31,7 +31,7 @@ class TestKidHeader:
     """JWT Header 应携带 kid 且可被本服务解码。"""
 
     def test_global_token_has_kid_and_roundtrip(self):
-        token = create_access_token(subject="u", user_id=1, service_name="default")
+        token = create_access_token(subject="u", user_id=1, service_name="default", role="user")
         header = jose_jwt.get_unverified_header(token)
         assert header.get("alg") == "RS256"
         kid = header.get("kid")
@@ -171,7 +171,7 @@ class TestRotation:
 @pytest.mark.asyncio
 async def test_global_security_module_loaded(tmp_path):
     """全局 security 模块（真实 keys/ 目录）可正常签发并携带 kid。"""
-    token = create_access_token(subject="s", user_id=7, service_name="forum")
+    token = create_access_token(subject="s", user_id=7, service_name="forum", role="user")
     header = jose_jwt.get_unverified_header(token)
     assert header.get("kid")
     payload = decode_token(token)

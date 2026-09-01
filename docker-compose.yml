@@ -16,6 +16,12 @@ services:
       - JWT_ROTATION_CHECK_HOURS=24
       - ALGORITHM=RS256
       - LOG_LEVEL=INFO
+      # 超级用户（部署引导）：启动时自动创建；密码从宿主机环境变量注入，生产必须设置强密码
+      - SUPERUSER_USERNAME=${SUPERUSER_USERNAME:-superuser}
+      - SUPERUSER_PASSWORD=${SUPERUSER_PASSWORD:-}
+      - SUPERUSER_EMAIL=${SUPERUSER_EMAIL:-superuser@local.local}
+      - SUPERUSER_FULL_NAME=${SUPERUSER_FULL_NAME:-Super User}
+      - SUPERUSER_SERVICE_NAME=${SUPERUSER_SERVICE_NAME:-default}
     volumes:
       # 密钥目录挂载（含各 kid 的 PEM 与 jwt_state.json）。
       # 注意：密钥自动轮换需要在运行期写入新密钥/状态，因此必须可写挂载；
