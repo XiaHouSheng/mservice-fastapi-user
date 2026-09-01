@@ -29,12 +29,21 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool = False
 
     # JWT（RS256 非对称加密：私钥签发，公钥校验）
-    # 值可以是 PEM 字符串，也可以是 PEM 文件路径（security.py 自动识别并读取）
+    # JWT_PRIVATE_KEY / JWT_PUBLIC_KEY 作为首次启动的旧 PEM 迁移导入来源（路径或 PEM 字符串）
     JWT_PRIVATE_KEY: str = "keys/jwt_private.pem"
     JWT_PUBLIC_KEY: str = "keys/jwt_public.pem"
     ALGORITHM: str = "RS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # JWT 密钥轮换（本地文件管理，无需数据库）
+    JWT_KEY_DIR: str = "keys"          # 密钥目录：jwt_private_<kid>.pem / jwt_public_<kid>.pem / jwt_state.json
+    JWT_ROTATION_INTERVAL_DAYS: int = 30   # 当前签名密钥使用多久后轮换
+    JWT_RETIRE_DAYS: int = 8               # 旧公钥保留天数（需 >= 最长 JWT 有效期，默认 7 天 refresh + 余量）
+    JWT_ROTATION_CHECK_HOURS: int = 24     # 后台检查轮换的间隔（小时）
+
+    # 可注册业务列表（预留，专供给可选业务；user.service_name 建议在此列表内）
+    REGISTERED_SERVICES: List[str] = ["forum", "shop", "game"]
 
     # 密码
     PASSWORD_BCRYPT_ROUNDS: int = 12
@@ -60,7 +69,7 @@ class Settings(BaseSettings):
         "role_change",
     ]
 
-    @field_validator("ALLOWED_ORIGINS", "LOG_OPERATIONS", mode="before")
+    @field_validator("ALLOWED_ORIGINS", "LOG_OPERATIONS", "REGISTERED_SERVICES", mode="before")
     @classmethod
     def _parse_list(cls, v):
         """支持从 .env 读取 JSON 数组字符串。"""

@@ -1,12 +1,11 @@
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 
 from jose import JWTError, jwt
-from jose.jwk import RSAKey
 from passlib.context import CryptContext
 
 from app.core.config import settings
+from app.core.key_manager import KeyManager
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -14,17 +13,15 @@ pwd_context = CryptContext(
     bcrypt__rounds=settings.PASSWORD_BCRYPT_ROUNDS,
 )
 
-
-def _load_key(value: str) -> str:
-    """解析 JWT 密钥：若值为 PEM 字符串则直接返回，否则视为文件路径读取。"""
-    if value and "-----BEGIN" not in value:
-        return Path(value).read_text(encoding="utf-8")
-    return value
-
-
-# RS256 非对称：私钥仅用于签发（保留在 user-service），公钥用于校验（可对外分发）
-_private_key = _load_key(settings.JWT_PRIVATE_KEY)
-_public_key = _load_key(settings.JWT_PUBLIC_KEY)
+# RS256 非对称 + 自动轮换：私钥仅用于签发（保留在 user-service），公钥可对外分发校验。
+# 旧 PEM（JWT_PRIVATE_KEY / JWT_PUBLIC_KEY）作为首次启动的迁移导入来源。
+key_manager = KeyManager(
+    key_dir=settings.JWT_KEY_DIR,
+    rotation_interval_days=settings.JWT_ROTATION_INTERVAL_DAYS,
+    retire_days=settings.JWT_RETIRE_DAYS,
+    legacy_private=settings.JWT_PRIVATE_KEY,
+    legacy_public=settings.JWT_PUBLIC_KEY,
+)
 
 
 def hash_password(password: str) -> str:
@@ -44,7 +41,7 @@ def _create_token(
     expires_delta: timedelta,
     token_type: str,
 ) -> str:
-    """使用私钥生成 JWT 令牌。"""
+    """使用当前签名密钥生成 JWT 令牌（Header 携带 kid）。"""
     expire = datetime.now(timezone.utc) + expires_delta
     payload: dict[str, Any] = {
         "sub": subject,
@@ -53,7 +50,13 @@ def _create_token(
         "type": token_type,
         "exp": expire,
     }
-    return jwt.encode(payload, _private_key, algorithm=settings.ALGORITHM)
+    kid, private_key = key_manager.get_signing_key()
+    return jwt.encode(
+        payload,
+        private_key,
+        algorithm=settings.ALGORITHM,
+        headers={"kid": kid},
+    )
 
 
 def create_access_token(subject: str, user_id: int, service_name: str) -> str:
@@ -78,15 +81,30 @@ def create_refresh_token(subject: str, user_id: int, service_name: str) -> str:
     )
 
 
+def _kid_from_token(token: str) -> str | None:
+    """读取 JWT Header 中的 kid；解析失败返回 None。"""
+    try:
+        return jwt.get_unverified_header(token).get("kid")
+    except Exception:
+        return None
+
+
 def decode_token(token: str) -> dict[str, Any]:
-    """使用公钥解码并校验 JWT，失败抛出 JWTError。"""
-    return jwt.decode(token, _public_key, algorithms=[settings.ALGORITHM])
+    """使用对应 kid 的公钥解码并校验 JWT，失败抛出 JWTError。"""
+    kid = _kid_from_token(token)
+    if kid is not None:
+        public_key = key_manager.get_public_key(kid)
+        if public_key is None:
+            raise JWTError(f"未知的 kid: {kid}")
+    else:
+        # 兼容旧的无 kid 令牌：用当前签名公钥校验
+        public_key = key_manager.get_public_key(key_manager.current_kid)
+    return jwt.decode(token, public_key, algorithms=[settings.ALGORITHM])
 
 
 def get_jwks() -> dict[str, Any]:
-    """以 JWK 集合形式返回公钥，供其他服务通过 /.well-known/jwks.json 获取并验证令牌。"""
-    rsa_key: RSAKey = RSAKey(_public_key.encode("utf-8"), algorithm=settings.ALGORITHM)
-    return {"keys": [rsa_key.to_dict()]}
+    """返回 JWKS：包含当前与未过期的旧公钥（多 kid），供其他服务按 kid 验证。"""
+    return key_manager.get_jwks(algorithm=settings.ALGORITHM)
 
 
 __all__ = [
@@ -96,5 +114,6 @@ __all__ = [
     "create_refresh_token",
     "decode_token",
     "get_jwks",
+    "key_manager",
     "JWTError",
 ]

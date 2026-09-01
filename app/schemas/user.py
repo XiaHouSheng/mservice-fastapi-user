@@ -14,7 +14,6 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=30)
-    profile: dict[str, object] | None = Field(None, description="业务扩展字段，根据 service_name 对应扩展表")
 
     @field_validator("password")
     @classmethod
@@ -29,7 +28,6 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: str | None = Field(None, max_length=100)
     service_name: str | None = Field(None, max_length=50)
-    profile: dict[str, object] | None = Field(None, description="业务扩展字段，根据 service_name 对应扩展表")
 
 
 class UserChangePassword(BaseModel):
@@ -47,7 +45,7 @@ class UserChangePassword(BaseModel):
 
 
 class UserResponse(BaseModel):
-    """基础用户响应，所有 service 共享的字段。"""
+    """基础用户响应。"""
 
     model_config = ConfigDict(from_attributes=True)
 

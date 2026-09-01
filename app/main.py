@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,22 +7,43 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.database import init_db
-from app.core.security import get_jwks
-from app.services.business_registry import setup_services
+from app.core.security import get_jwks, key_manager
 from app.utils.logger import setup_logger
+
+
+async def _rotation_loop(logger) -> None:
+    """后台任务：定期检查并执行 JWT 密钥轮换 / 旧公钥清理。"""
+    interval_seconds = settings.JWT_ROTATION_CHECK_HOURS * 3600
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            if key_manager.check_rotation():
+                logger.info("JWT 密钥已轮换，当前 kid=%s", key_manager.current_kid)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("JWT 密钥轮换检查失败")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时初始化数据库，关闭时清理资源。"""
+    """应用生命周期：启动时初始化数据库并启动密钥轮换任务，关闭时清理资源。"""
     logger = setup_logger()
     logger.info("正在启动 %s v%s (env=%s)", settings.APP_NAME, settings.APP_VERSION, settings.APP_ENV)
-    setup_services()
-    logger.info("业务服务注册完成")
+    logger.info("JWT 当前签名 kid=%s，活跃公钥=%s", key_manager.current_kid, key_manager.get_active_kids())
     await init_db()
     logger.info("数据库初始化完成")
-    yield
-    logger.info("应用已关闭")
+
+    rotation_task = asyncio.create_task(_rotation_loop(logger))
+    logger.info(
+        "JWT 密钥轮换后台任务已启动（每 %s 小时检查一次）",
+        settings.JWT_ROTATION_CHECK_HOURS,
+    )
+    try:
+        yield
+    finally:
+        rotation_task.cancel()
+        logger.info("应用已关闭")
 
 
 def create_app() -> FastAPI:
@@ -62,7 +84,7 @@ def create_app() -> FastAPI:
             "jwks": "/.well-known/jwks.json",
         }
 
-    # JWT 公钥（JWKS），供其他服务获取公钥验证本服务签发的令牌
+    # JWT 公钥（JWKS），供其他服务获取公钥验证本服务签发的令牌（可能包含多个 kid）
     @app.get("/.well-known/jwks.json", tags=["系统"], summary="JWT 公钥（JWKS）")
     async def jwks() -> dict:
         return get_jwks()

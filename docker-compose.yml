@@ -7,14 +7,20 @@ services:
     environment:
       - APP_ENV=production
       - DATABASE_URL=sqlite+aiosqlite:///./data/user_service.db
-      # JWT 非对称加密（RS256）：私钥/公钥 PEM 通过 ./keys 卷只读注入（勿烘焙进镜像）
+      # JWT 非对称加密（RS256）：密钥目录通过 ./keys 卷挂载（勿烘焙进镜像）
       - JWT_PRIVATE_KEY=keys/jwt_private.pem
       - JWT_PUBLIC_KEY=keys/jwt_public.pem
+      - JWT_KEY_DIR=keys
+      - JWT_ROTATION_INTERVAL_DAYS=30
+      - JWT_RETIRE_DAYS=8
+      - JWT_ROTATION_CHECK_HOURS=24
       - ALGORITHM=RS256
       - LOG_LEVEL=INFO
     volumes:
-      # 密钥目录只读挂载（容器仅读取；私钥勿提交仓库，公钥可分发给其他服务校验）
-      - ./keys:/app/keys:ro
+      # 密钥目录挂载（含各 kid 的 PEM 与 jwt_state.json）。
+      # 注意：密钥自动轮换需要在运行期写入新密钥/状态，因此必须可写挂载；
+      # 私钥勿提交仓库，宿主机侧请按敏感目录管控权限。
+      - ./keys:/app/keys
       # SQLite 数据库及 WAL/SHM 辅助文件持久化到宿主机 ./data 目录
       - ./data:/app/data
       - ./logs:/app/logs
