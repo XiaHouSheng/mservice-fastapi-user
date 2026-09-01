@@ -10,7 +10,6 @@
 - **Pydantic v2** - 数据验证
 - **JWT (python-jose)** - 令牌认证（RS256 + 自动密钥轮换）
 - **Passlib (bcrypt)** - 密码哈希
-- **Alembic** - 数据库迁移
 - **Log Proxy** - 操作日志代理模式
 
 ## 项目结构
@@ -50,7 +49,8 @@ app/
 ```bash
 python -m venv .venv
 .venv\Scripts\activate  # Windows
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # 开发：含热重载与测试依赖
+# 生产部署仅需：pip install -r requirements.txt
 ```
 
 ### 2. 配置环境变量
@@ -199,18 +199,9 @@ REGISTERED_SERVICES=["forum","shop","game"]
 - 未来接入可选业务时，可在此列表中登记业务名，并在 `service_name` 字段中引用。
 - `service_name` 字段保留在用户主表中，支持按业务筛选用户列表。
 
-## 数据库迁移
+## 数据库建表
 
-```bash
-# 生成迁移
-alembic revision --autogenerate -m "描述"
-
-# 执行迁移
-alembic upgrade head
-
-# 回滚
-alembic downgrade -1
-```
+开发环境在服务启动时（lifespan）通过 `init_db` 自动建表（`Base.metadata.create_all`），无需手动迁移。若后续引入 Alembic 迁移，可在此补充。
 
 ## Docker 部署
 

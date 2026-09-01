@@ -1,17 +1,15 @@
 # Web 框架
 fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
+uvicorn>=0.30.0
 python-multipart>=0.0.9
 
 # 数据库
 SQLAlchemy>=2.0.30
 aiosqlite>=0.20.0
-alembic>=1.13.0
 
 # 数据验证
-pydantic>=2.7.0
-pydantic-settings>=2.2.0
 pydantic[email]>=2.7.0
+pydantic-settings>=2.2.0
 email-validator>=2.1.0
 
 # 安全
@@ -19,10 +17,7 @@ python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 bcrypt>=4.0.0,<4.1
 
-# 工具
-python-dotenv>=1.0.0
-
-# 测试
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-httpx>=0.27.0
+# 说明
+# - 已移除 alembic（当前未使用数据库迁移，由 init_db 自动建表）
+# - 已移除 python-dotenv 显式声明（由 pydantic-settings 传递提供）
+# - 生产使用纯 uvicorn；热重载（uvicorn[standard]）与测试依赖见 requirements-dev.txt
